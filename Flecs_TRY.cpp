@@ -39,6 +39,43 @@ struct LuaComponentBinding {
 
 std::unordered_map<std::string, LuaComponentBinding> luaComponentRegistry;
 
+
+//Original Error
+//The TransformTester destructor was called at program exit rather than when removing the component because :
+//
+//Component Storage : When you added the Transform component to an entity, Flecs stored a copy of the Transform struct in its internal storage.
+//
+//Shared Pointer Copies : The Lua getComponent function was creating a copy of the Transform struct (and its shared_ptr).This increased the reference count of the shared_ptr to 2 (one in Flecs storage, one in Lua).
+//
+//Premature Retention : When you removed the component from Flecs, the entity's copy was destroyed (reference count decreased to 1), but Lua still held its copy, keeping the TransformTester alive.
+//
+//The Fix
+//The key change was modifying how components are retrieved :
+//
+//Before(Problematic) :
+//
+//    cpp
+//    // Returned a COPY of the component
+//    return sol::make_object(lua, *e.get<T>());
+//After(Fixed) :
+//
+//    cpp
+//    // Returned a POINTER to the component's data
+//    T* ptr = e.get_mut<T>();
+//return sol::make_object(lua, ptr);
+//Why This Worked :
+//
+//By returning a pointer to the component stored in Flecs(instead of a copy), Lua now references the exact same shared_ptr inside the Flecs component.
+//
+//When the component is removed :
+//
+//Flecs destroys its storage of Transform, dropping the shared_ptr reference count to 0.
+//
+//This immediately triggers the TransformTester destructor(no lingering copies in Lua).
+//
+
+
+
 // Helper function to register components for Lua
 template<typename T>
 void registerComponent(sol::state& lua, flecs::world& world, const std::string& name) {
@@ -50,10 +87,11 @@ void registerComponent(sol::state& lua, flecs::world& world, const std::string& 
             auto t = obj.as<T>();
             e.set<T>(t);
         },
-        // Get
+        // Get (returns a pointer to the component)
         [&lua](flecs::entity e) -> sol::object {
             if (e.has<T>()) {
-                return sol::make_object(lua, *e.get<T>());
+                T* ptr = e.get_mut<T>(); //<= Explanation for this line is explained above.
+                return sol::make_object(lua, ptr); //<= Explanation for this line is explained above.
             }
             return sol::nil;
         },
@@ -117,10 +155,12 @@ void bindEntity(sol::state& lua) {
             }
             return sol::nil;
         },
-        "removeComponent", [](flecs::entity self, const std::string& name) {
+        "removeComponent", [&lua](flecs::entity self, const std::string& name) {
             auto it = luaComponentRegistry.find(name);
             if (it != luaComponentRegistry.end()) {
                 it->second.remove(self);
+                // Force Lua garbage collection to clean up any references
+                lua.collect_garbage();
             }
         },
         "id", &flecs::entity::id
