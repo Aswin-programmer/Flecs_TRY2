@@ -6,11 +6,19 @@
 
 // Component definition
 struct Transform {
-    float x = 0.0f;
-    float y = 0.0f;
+    float x = 0;
+    float y = 0;
 
     Transform() = default;
     Transform(float x_, float y_) : x(x_), y(y_) {}
+};
+
+struct Velocity {
+    float vx = 0;
+    float vy = 0;
+
+    Velocity() = default;
+    Velocity(float vx_, float vy_) : vx(vx_), vy(vy_) {}
 };
 
 
@@ -28,35 +36,66 @@ struct LuaComponentBinding {
 std::unordered_map<std::string, LuaComponentBinding> luaComponentRegistry;
 
 // Helper function to register components for Lua
-void registerTransform(sol::state& lua, flecs::world& world) {
-    world.component<Transform>();
+template<typename T>
+void registerComponent(sol::state& lua, flecs::world& world, const std::string& name) {
+    world.component<T>();
 
-    // Expose Transform to Lua
-    lua.new_usertype<Transform>("Transform",
-        sol::call_constructor, sol::constructors<Transform(), Transform(float, float)>(),
-        "x", &Transform::x,
-        "y", &Transform::y
-    );
-
-    luaComponentRegistry["Transform"] = {
+    luaComponentRegistry[name] = {
         // Add
         [&world](flecs::entity e, sol::object obj) {
-            auto t = obj.as<Transform>();
-            e.set<Transform>(t);
+            auto t = obj.as<T>();
+            e.set<T>(t);
         },
         // Get
-        [&world, &lua](flecs::entity e) -> sol::object {
-            if (e.has<Transform>()) {
-                return sol::make_object(lua, *e.get<Transform>());
+        [&lua](flecs::entity e) -> sol::object {
+            if (e.has<T>()) {
+                return sol::make_object(lua, *e.get<T>());
             }
             return sol::nil;
         },
         // Remove
-        [&world](flecs::entity e) {
-            e.remove<Transform>();
+        [](flecs::entity e) {
+            e.remove<T>();
         }
     };
 }
+
+void CreateUserTypeTransformComponent(sol::state& lua)
+{
+    lua.new_usertype<Transform>(
+        "Transform",
+        sol::call_constructor,
+        sol::factories(
+            [](float x, float y) {
+                return Transform(
+                    x,
+                    y
+                );
+            }
+        ),
+        "x", &Transform::x,
+        "y", &Transform::y
+    );
+}
+
+void CreateUserTypeVelocityComponent(sol::state& lua)
+{
+    lua.new_usertype<Velocity>(
+        "Velocity",
+        sol::call_constructor,
+        sol::factories(
+            [](float x, float y) {
+                return Velocity(
+                    x,
+                    y
+                );
+            }
+        ),
+        "vx", &Velocity::vx,
+        "vy", &Velocity::vy
+    );
+}
+
 
 // Binding flecs::entity for Lua
 void bindEntity(sol::state& lua) {
@@ -90,8 +129,15 @@ int main() {
     lua.open_libraries(sol::lib::base);
 
     // Register components and bindings
-    registerTransform(lua, ecs);
+    // Register all components with one line each
+    registerComponent<Transform>(lua, ecs, "Transform");
+    registerComponent<Velocity>(lua, ecs, "Velocity");
+
     bindEntity(lua);
+
+    // Register of all the components
+    CreateUserTypeTransformComponent(lua);
+    CreateUserTypeVelocityComponent(lua);
 
     // Create entity and expose to Lua
     flecs::entity player = ecs.entity("Player");
@@ -113,6 +159,10 @@ int main() {
         -- Remove Transform
         player:removeComponent("Transform")
         print("Removed Transform.")
+
+        player:addComponent("Velocity", Velocity(1.5, -0.3))
+        local v = player:getComponent("Velocity")
+        print("VX:", v.vx, "VY:", v.vy)
     )");
 
     return 0;
