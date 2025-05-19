@@ -5,15 +5,16 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
+#include <memory>
 
-// Component definition
+#include "TransformTester.h"
+
 struct Transform {
-    float x = 0;
-    float y = 0;
 
-    Transform() = default;
-    Transform(float x_, float y_) : x(x_), y(y_) {}
+    std::shared_ptr<TransformTester> transformTester{ nullptr };
+
 };
+
 
 struct Velocity {
     float vx = 0;
@@ -21,6 +22,7 @@ struct Velocity {
 
     Velocity() = default;
     Velocity(float vx_, float vy_) : vx(vx_), vy(vy_) {}
+    
 };
 
 
@@ -69,14 +71,14 @@ void CreateUserTypeTransformComponent(sol::state& lua)
         sol::call_constructor,
         sol::factories(
             [](float x, float y) {
-                return Transform(
-                    x,
-                    y
-                );
+                return Transform{
+                    .transformTester = std::make_shared<TransformTester>(x, y)
+                };
             }
         ),
-        "x", &Transform::x,
-        "y", &Transform::y
+        "AddTwoNumber", [](Transform& self) {
+            return self.transformTester->AddTwoNumbers();
+        }
     );
 }
 
@@ -209,17 +211,7 @@ int main() {
         
         -- Get and update Transform
         local t = player:getComponent("Transform")
-        t.x = 42
-        t.y = 128
-        print("Transform X:", t.x, "Y:", t.y)
-
-        local n = 0
-        while n < 20 do
-            t.x = t.x + 1
-            t.y = t.y + 1
-            print("Transform X:", t.x, "Y:", t.y)
-            n = n + 1
-        end
+        print(t:AddTwoNumber())
 
         -- Remove Transform
         player:removeComponent("Transform")

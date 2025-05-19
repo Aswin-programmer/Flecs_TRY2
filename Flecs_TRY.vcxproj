@@ -149,9 +149,11 @@
   <ItemGroup>
     <ClCompile Include="FLECS\flecs.c" />
     <ClCompile Include="Flecs_TRY.cpp" />
+    <ClCompile Include="TransformTester.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FLECS\flecs.h" />
+    <ClInclude Include="TransformTester.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

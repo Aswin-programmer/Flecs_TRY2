@@ -21,9 +21,15 @@
     <ClCompile Include="FLECS\flecs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TransformTester.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FLECS\flecs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TransformTester.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
